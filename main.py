@@ -1,9 +1,35 @@
 from datetime import timedelta
+from dataclasses import dataclass
 import re
+import subprocess
 
 from ostrich.utils.text import get_safe_path
-from pydub import AudioSegment
 from pytube import YouTube
+
+@dataclass
+class Chapter:
+    timestamp: str
+    title: str
+
+def extract_segment(start: str, end: str | None = None, title: str = "") -> None:
+    command = [
+        "ffmpeg",
+        "-i",
+        "video.mp4",
+        "-ss",
+        start,
+        "-to",
+        end,
+        "-q:a",
+        "0",
+        "-map",
+        "a",
+        f"{get_safe_path(title)}.mp3",
+    ]
+    if not end:
+        command.pop(5)
+        command.pop(5)
+    subprocess.run(command)
 
 
 def detect_chapters(yt: YouTube) -> list[tuple[str, str]]:
@@ -13,7 +39,7 @@ def detect_chapters(yt: YouTube) -> list[tuple[str, str]]:
         if re.match(r".*\d{1,2}:\d{2}.*", line):
             timestamp = re.search(r"(\d{1,2}:\d{2}(:\d{2})?)", line).group(0)
             title = line.replace(timestamp, "").strip()
-            chapters.append((timestamp, title))
+            chapters.append(Chapter(timestamp, title))
     return chapters
 
 
@@ -23,28 +49,14 @@ def main() -> None:
         "resolution"
     ).desc().first().download(filename="video.mp4")
     chapters = detect_chapters(yt)
-    audio_segment = AudioSegment.from_file("video.mp4", "mp4")
-    for chapter, index in enumerate(chapters):
-        timestamp = chapter[0].split(":")[::-1]
-        title = chapter[1]
-        start_time = timedelta(
-            hours=int(timestamp[2]) if len(timestamp) == 3 else 0,
-            minutes=int(timestamp[1]),
-            seconds=int(timestamp[0]),
-        )
+    for index, chapter in enumerate(chapters):
+        print(f"Processing chapter: {chapter}")
 
         if index < len(chapters) - 1:
-            next_timestamp = chapters[index + 1][0].split(":")[::-1]
-            next_start_time = timedelta(
-                hours=int(next_timestamp[2]) if len(next_timestamp) == 3 else 0,
-                minutes=int(next_timestamp[1]),
-                seconds=int(next_timestamp[0]),
-            )
-            chapter_segment = audio_segment[start_time.total_seconds() * 1000 :next_start_time.total_seconds() * 1000]
+            next_chapter = chapters[index + 1]
+            extract_segment(chapter.timestamp, next_chapter.timestamp, chapter.title)
         else:
-            chapter_segment = audio_segment[start_time.total_seconds() * 1000 :]
-        chapter_segment.export(get_safe_path(f"{title}.mp3"), format="mp3")
-
+            extract_segment(chapter.timestamp, None, chapter.title)
 
 if __name__ == "__main__":
     main()

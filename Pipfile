@@ -5,7 +5,6 @@ name = "pypi"
 
 [packages]
 pytube = "*"
-pydub = "*"
 ostrichlib = "*"
 
 [dev-packages]
