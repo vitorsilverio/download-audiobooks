@@ -32,7 +32,7 @@ def extract_segment(start: str, end: str | None = None, title: str = "") -> None
     subprocess.run(command)
 
 
-def detect_chapters(yt: YouTube) -> list[tuple[str, str]]:
+def detect_chapters(yt: YouTube) -> list[Chapter]:
     chapters = []
     # Try to get the chapters from the video description
     for line in yt.description.split("\n"):
